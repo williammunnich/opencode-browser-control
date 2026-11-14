@@ -1,0 +1,119 @@
+<!doctype html>
+<!--
+  @file sidepanel.html
+  The chat panel that opens at the side of Chrome when you click the extension's icon. You type
+  at the bottom; OpenCode (running on this computer) answers and can work in the tabs of the
+  "OpenCode" tab group. The "..." button opens the controls: add or take back the current tab,
+  sites waiting for approval, and the always-allowed list.
+  Layout and styles only; the logic is in sidepanel.js.
+  Project: opencode-browser-control
+  @author Claude (Anthropic), written for and prompted by William Munnich
+  @date Last edited 2026-11-14
+-->
+<html lang="en"><head><meta charset="utf-8"><title>OpenCode Browser Control</title>
+<style>
+  /* ----------------------------------------------------------------------------------------
+   * Theme: every colour of the panel is set here (light first, then dark). Change these to
+   * restyle it; nothing below uses a colour of its own.
+   *   --bg        panel background            --panel     boxes: composer, cards, menus
+   *   --fg        text                        --muted     secondary text and icons
+   *   --line      borders and dividers        --focus     composer border while typing
+   *   --me        your message bubbles, hover --code      code blocks in replies
+   *   --accent    buttons, links, switch on   --on-accent text on accent and red buttons
+   *   --red       Deny / Stop / errors        --knob      the switch's knob
+   *   --shadow    the composer's shadow
+   * -------------------------------------------------------------------------------------- */
+  :root{--bg:#fafafa;--panel:#fff;--fg:#18181b;--muted:#71717a;--line:#e4e4e7;--focus:#a1a1aa;--me:#f4f4f5;--code:#f4f4f5;
+    --accent:#2563eb;--on-accent:#fff;--red:#dc2626;--knob:#fff;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06)}
+  @media (prefers-color-scheme:dark){:root{--bg:#18181b;--panel:#27272a;--fg:#f4f4f5;--muted:#a1a1aa;--line:#3f3f46;--focus:#71717a;--me:#3f3f46;--code:#18181b;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35)}}
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+  header{display:flex;align-items:center;gap:8px;padding:12px 14px}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;flex:1}
+  .brand svg{width:20px;height:20px;color:var(--accent)}
+  .icon{all:unset;cursor:pointer;display:grid;place-items:center;width:32px;height:32px;border-radius:8px;color:var(--muted)}
+  .icon:hover{background:var(--me);color:var(--fg)} .icon:focus-visible{outline:2px solid var(--accent)} .icon svg{width:18px;height:18px}
+  .rule{height:1px;background:var(--line)}
+  #controls{display:none;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px}
+  #controls.open{display:block}
+  #past{display:none;max-height:45vh;overflow-y:auto;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px}
+  #past.open{display:block} #past ul{list-style:none;margin:0;padding:6px}
+  #past li{display:flex;flex-direction:column;gap:1px;padding:7px 10px;border-radius:8px;cursor:pointer} #past li:hover,#past li:focus-visible{background:var(--me);outline:0}
+  #past li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} #past li small{color:var(--muted);font-size:11px}
+  #controls h2{font-size:11px;margin:12px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  #controls h2:first-child{margin-top:0}
+  #controls ul{list-style:none;margin:0;padding:0} #controls li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;overflow-wrap:anywhere}
+  .pill{all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;font-weight:600;font-size:12px;line-height:1.2;color:var(--on-accent);background:var(--accent);white-space:nowrap}
+  .pill.ghost{background:transparent;color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)} .pill.red{background:var(--red)} .pill:disabled{opacity:.5;cursor:default}
+  .pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .rowbtns{display:flex;gap:6px;flex-wrap:wrap}
+  #status{font-size:12px;color:var(--muted);padding:6px 16px 0;min-height:22px} #status.bad{color:var(--red)}
+  #log{flex:1;overflow-y:auto;padding:10px 16px 16px;display:flex;flex-direction:column;gap:14px}
+  #empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--muted);text-align:center;font-size:13px;max-width:260px}
+  #empty svg{width:56px;height:56px;opacity:.28}
+  .me{align-self:flex-end;max-width:88%;padding:8px 12px;border-radius:16px;background:var(--me);white-space:pre-wrap;overflow-wrap:anywhere}
+  .queued{opacity:.6} .qbar{display:flex;gap:10px;align-items:center;margin-top:4px;font-size:11px;color:var(--muted)}
+  .link{all:unset;cursor:pointer;color:var(--accent);font-weight:600} .link:hover{text-decoration:underline} .link:focus-visible{outline:2px solid var(--accent)}
+  .ai{overflow-wrap:anywhere} .ai p{margin:0 0 8px;white-space:pre-wrap} .ai p:last-child{margin-bottom:0}
+  .ai code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:5px}
+  .ai pre{margin:0 0 8px;padding:10px;border-radius:10px;background:var(--code);overflow-x:auto;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .think{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:10px} .think summary{cursor:pointer;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .think div{white-space:pre-wrap;overflow-wrap:anywhere;font-style:italic;margin-top:4px}
+  .step{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:-8px 0}
+  .err{color:var(--red);white-space:normal}
+  .askcard{border:1px solid var(--accent);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--panel);font-size:13px}
+  form{margin:0 12px 6px;padding:12px 12px 8px;border:1px solid var(--line);border-radius:22px;background:var(--panel);box-shadow:var(--shadow)}
+  form:focus-within{border-color:var(--focus)}
+  textarea{display:block;width:100%;resize:none;border:0;outline:0;background:transparent;color:var(--fg);font:inherit;min-height:44px;max-height:180px;padding:2px 4px}
+  textarea::placeholder{color:var(--muted)}
+  .bar{display:flex;align-items:center;gap:6px;margin-top:4px}
+  .switch{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 9px 4px 4px;border-radius:999px;font-size:12px;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line);white-space:nowrap}
+  .switch .knob{width:22px;height:14px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .15s}
+  .switch .knob::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--knob);transition:transform .15s}
+  .switch[aria-checked=true]{color:var(--fg);box-shadow:inset 0 0 0 1px var(--accent)} .switch[aria-checked=true] .knob{background:var(--accent)} .switch[aria-checked=true] .knob::after{transform:translateX(8px)}
+  .switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  #model{flex:1;text-align:right;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:4px}
+  #model b{color:var(--fg);font-weight:500}
+  #send{all:unset;cursor:pointer;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--fg);color:var(--bg)}
+  #send:disabled{background:var(--me);color:var(--muted);cursor:default} #send.stop{background:var(--red);color:var(--on-accent)} #send svg{width:16px;height:16px}
+  #send:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  footer{padding:0 18px 10px;font-size:11px;color:var(--muted);min-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style></head><body>
+  <header>
+    <div class="brand">
+      <img src="icons/icon-48.png" alt="" width="20" height="20">
+      Browser Control
+    </div>
+    <button class="icon" id="history" title="Earlier chats" aria-label="Earlier chats" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.3M3 4v4h4M12 7v5l3 2"/></svg></button>
+    <button class="icon" id="new" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
+    <button class="icon" id="menu" title="Controls" aria-label="Controls" aria-expanded="false"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+  </header>
+  <div class="rule"></div>
+  <section id="controls" aria-label="Controls">
+    <h2>Browser control</h2>
+    <div class="rowbtns"><button class="pill ghost" id="add">Add this tab to the group</button><button class="pill ghost" id="remove">Take this tab back</button></div>
+    <h2>Tabs OpenCode may use</h2><ul id="tabs"></ul>
+    <h2>Waiting for your answer</h2><ul id="pending"></ul>
+    <h2>Always allowed sites</h2><ul id="allowed"></ul>
+  </section>
+  <section id="past" aria-label="Earlier chats"><ul id="pastlist"></ul></section>
+  <div id="status"></div>
+  <div id="log" aria-live="polite">
+    <div id="empty">
+      <img src="icons/icon-128.png" alt="" width="56" height="56" style="opacity:.35;filter:grayscale(1)">
+      <span>OpenCode works in the tabs of the “OpenCode” tab group. Press + to hand it the tab in front.</span>
+    </div>
+  </div>
+  <form id="form">
+    <textarea id="text" rows="2" placeholder="How can I help you today?" aria-label="Message"></textarea>
+    <div class="bar">
+      <button type="button" class="icon" id="plus" title="Add the tab in front to the OpenCode group" aria-label="Add this tab to the OpenCode group"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" class="switch" id="control" role="switch" aria-checked="false" title="Let OpenCode control the browser (tabs in the OpenCode group)"><span class="knob"></span><span id="controlLabel">Browser control off</span></button>
+      <div id="model"></div>
+      <button id="send" title="Send" aria-label="Send" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></button>
+    </div>
+  </form>
+  <footer id="cost"></footer>
+  <script src="sidepanel.js"></script>
+</body></html>

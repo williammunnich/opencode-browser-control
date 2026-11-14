@@ -1,0 +1,23 @@
+#!/bin/zsh
+# @file opencode-chat-server
+# Starts the server behind the chat in the "OpenCode Browser Control" Chrome extension's side
+# panel (server/chat-server.mjs). Leave it running while you want to chat from Chrome; stop it
+# with Ctrl-C. Running it twice is harmless (the second one says so and exits).
+#
+# Before starting it, this script
+#   - loads API keys from the macOS Keychain if you keep them there (optional, see
+#     bin/keychain-env.zsh; keys never touch a file), and
+#   - puts the usual install places of `opencode` and `node` in front of the PATH, because a
+#     program started at login does not get your shell's PATH.
+# It changes nothing on the computer.
+#
+# @project opencode-browser-control
+# @usage bin/opencode-chat-server        (in a terminal; add `&` or use `nohup` to keep it in the background)
+# @env OPENCODE_BIN  full path of the `opencode` program, when it is not in one of the usual places
+# @exit 1 when the server could not start (for example it is already running, or opencode is not installed)
+# @author Claude (Anthropic), written for and prompted by William Munnich
+# @date Last edited 2026-11-14
+here="${0:A:h}"   # ${0:A:h} = real folder of this script, also when called through a symlink
+source "$here/keychain-env.zsh"
+export PATH="$HOME/.opencode/bin:$HOME/.config/opencode/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}"
+exec node "$here/../server/chat-server.mjs"

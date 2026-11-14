@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "OpenCode Browser Control",
+  "version": "1.12.0",
+  "description": "Lets OpenCode on this computer act in this Chrome: only in its own tab group, only on sites you approve. Unofficial project.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsNbLjdydxw5cG/QlrbN/PCSOP1efED/xKKNKCUhV/SdCWlcIjoLShVaF4eAQOnqvsfgNfQS4p65bZnVTph+oQKjqQ0ZuRRmpXaFvtsz3s9REup3on2J+rzCeoNDPTK1zGz4Mp2V/+eO2SP+FPT6FK6DeN0NFB6EGJnpj28ADPooOPpTunjECX3jmTF4fr7KnTfyuitYJNojtlr2E8mAJZhrcgTVN2yee2E3FnAIx+xe06jirox3ou6KvLoviuZA7Tkcd3bXv5C+VXInZ0NQct24U15/4aAzjRt3X0IlCEDhwcpWUVsF3AQGg1AleWnHyiVekXptDtzKFF2p4MKq4rQIDAQAB",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "scripting",
+    "storage",
+    "alarms",
+    "sidePanel",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "OpenCode Browser Control: open the chat panel",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

@@ -1,0 +1,22 @@
+# Operating system and tool leftovers
+.DS_Store
+node_modules/
+__pycache__/
+*.pyc
+*.log
+
+# Screenshots the agent takes are saved here, in whatever folder OpenCode runs in
+.opencode-chrome/
+
+# Benchmark run output: what the test site recorded, results, OpenCode's working folder
+bench/events.jsonl
+bench/results.json
+bench/work/
+
+# Keys and local-only files: never commit these
+*.pem
+*.p8
+*.crx
+.env
+.env.*
+.private-patterns
